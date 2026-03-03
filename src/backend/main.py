@@ -42,7 +42,7 @@ log = logging.getLogger("backend")
 
 # ── Resolve sibling package paths ────────────────────────────────────────────
 _BACKEND_DIR = Path(__file__).parent
-_SRC_DIR     = _BACKEND_DIR.parent.parent
+_SRC_DIR     = _BACKEND_DIR.parent          # src/
 _META_PATH   = _SRC_DIR / "model_training" / "models" / "model_metadata.json"
 
 if str(_BACKEND_DIR) not in sys.path:
