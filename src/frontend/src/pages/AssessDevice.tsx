@@ -91,7 +91,7 @@ function buildRandomForm(): AssetCreate {
     high_incidents:           highInc,
     medium_incidents:         medInc,
     low_incidents:            lowInc,
-    avg_resolution_time_hours:parseFloat((rr(1, 72) + Math.random()).toFixed(1)),
+    avg_resolution_time_hours:rr(1, 72),
   };
 }
 
@@ -105,14 +105,39 @@ const DEFAULT_FORM: AssetCreate = {
   usage_type: 'Standard',
 };
 
+const BATTERY_DEVICES = new Set(['Laptop', 'Tablet', 'Mobile Phone']);
+const NO_OS_DEVICES   = new Set(['Printer', 'Network Device', 'Monitor', 'Projector']);
+
 export default function AssessDevice() {
   const [form, setForm] = useState<AssetCreate>(DEFAULT_FORM);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AssessmentResultOut | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const hasBattery = BATTERY_DEVICES.has(form.device_type);
+  const filteredOS = NO_OS_DEVICES.has(form.device_type)
+    ? []
+    : (DEVICE_OS[form.device_type] ?? OS_OPTIONS);
+
+  const incidentSum = (form.critical_incidents ?? 0) + (form.high_incidents ?? 0)
+    + (form.medium_incidents ?? 0) + (form.low_incidents ?? 0);
+  const incidentMismatch = (form.total_incidents ?? 0) > 0
+    && incidentSum > (form.total_incidents ?? 0);
+
   const set = (k: keyof AssetCreate, v: unknown) =>
-    setForm(prev => ({ ...prev, [k]: v === '' ? undefined : v }));
+    setForm(prev => {
+      const next = { ...prev, [k]: v === '' ? undefined : v };
+      // Auto-sync overheating checkbox when thermal count changes
+      if (k === 'thermal_events_count' && typeof v === 'number') {
+        next.overheating_issues = v > 8;
+      }
+      // Clear battery fields when switching to a non-battery device
+      if (k === 'device_type' && !BATTERY_DEVICES.has(v as string)) {
+        next.battery_health_pct = undefined;
+        next.battery_cycles = undefined;
+      }
+      return next;
+    });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -199,8 +224,8 @@ export default function AssessDevice() {
             <div>
               <label className={labelClass}>OS</label>
               <select className={inputClass} value={form.os ?? ''} onChange={e => set('os', e.target.value)}>
-                <option value="">Select…</option>
-                {OS_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                <option value="">{NO_OS_DEVICES.has(form.device_type) ? 'N/A' : 'Select…'}</option>
+                {filteredOS.map(o => <option key={o}>{o}</option>)}
               </select>
             </div>
             <div>
@@ -215,11 +240,11 @@ export default function AssessDevice() {
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className={labelClass}>Model Year</label>
-              <input type="number" className={inputClass} value={form.model_year ?? ''} onChange={e => set('model_year', Number(e.target.value))} min={2000} max={new Date().getFullYear()} />
+              <input type="number" className={inputClass} value={form.model_year ?? ''} onChange={e => set('model_year', e.target.value ? Number(e.target.value) : undefined)} min={2000} max={new Date().getFullYear()} />
             </div>
             <div>
               <label className={labelClass}>Daily Usage (hrs)</label>
-              <input type="number" className={inputClass} value={form.daily_usage_hours ?? ''} onChange={e => set('daily_usage_hours', e.target.value ? Number(e.target.value) : undefined)} min={0} max={24} step={0.5} />
+              <input type="number" className={inputClass} value={form.daily_usage_hours ?? ''} onChange={e => set('daily_usage_hours', e.target.value ? Number(e.target.value) : undefined)} min={0} max={24} step={0.1} />
             </div>
             <div>
               <label className={labelClass}>Performance (1-5)</label>
@@ -230,16 +255,18 @@ export default function AssessDevice() {
           {/* ── Hardware Health ───────────────────────── */}
           <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide text-gray-400 pt-2">Hardware Health &amp; Telemetry</h2>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelClass}>Battery Health (%)</label>
-              <input type="number" className={inputClass} value={form.battery_health_pct ?? ''} onChange={e => set('battery_health_pct', e.target.value ? Number(e.target.value) : undefined)} min={0} max={100} />
+          {hasBattery && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>Battery Health (%)</label>
+                <input type="number" className={inputClass} value={form.battery_health_pct ?? ''} onChange={e => set('battery_health_pct', e.target.value ? Number(e.target.value) : undefined)} min={0} max={100} step={0.1} />
+              </div>
+              <div>
+                <label className={labelClass}>Battery Cycles</label>
+                <input type="number" className={inputClass} value={form.battery_cycles ?? ''} onChange={e => set('battery_cycles', e.target.value ? Number(e.target.value) : undefined)} min={0} />
+              </div>
             </div>
-            <div>
-              <label className={labelClass}>Battery Cycles</label>
-              <input type="number" className={inputClass} value={form.battery_cycles ?? ''} onChange={e => set('battery_cycles', e.target.value ? Number(e.target.value) : undefined)} min={0} />
-            </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -290,9 +317,15 @@ export default function AssessDevice() {
             </div>
             <div>
               <label className={labelClass}>Avg Resolution (hrs)</label>
-              <input type="number" className={inputClass} value={form.avg_resolution_time_hours ?? ''} onChange={e => set('avg_resolution_time_hours', e.target.value ? Number(e.target.value) : undefined)} min={0} step={0.5} />
+              <input type="number" className={inputClass} value={form.avg_resolution_time_hours ?? ''} onChange={e => set('avg_resolution_time_hours', e.target.value ? Number(e.target.value) : undefined)} min={0} step={1} />
             </div>
           </div>
+
+          {incidentMismatch && (
+            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              ⚠ Sub-incident counts ({incidentSum}) exceed Total Incidents ({form.total_incidents}). Please reconcile.
+            </p>
+          )}
 
           {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
