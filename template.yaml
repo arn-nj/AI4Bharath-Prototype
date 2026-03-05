@@ -115,7 +115,7 @@ Resources:
   RDSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: !Sub "ewaste-rds-sg-${StageName} — allow PostgreSQL inbound"
+      GroupDescription: !Sub "ewaste-rds-sg-${StageName} - allow PostgreSQL inbound"
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
