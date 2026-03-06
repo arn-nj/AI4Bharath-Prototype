@@ -6,10 +6,11 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // Proxy /api calls to FastAPI backend (no path rewrite — backend uses /api prefix)
+      // During local dev, proxy API calls to the backend to avoid CORS issues
       '/api': {
         target: process.env.VITE_BACKEND_URL ?? 'http://localhost:8000',
         changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
   },
