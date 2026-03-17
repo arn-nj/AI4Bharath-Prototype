@@ -307,7 +307,7 @@ sam deploy \
 
 ## Device types & locations
 
-### Supported device categories (10)
+### Supported device categories (10) 
 
 | Device type |
 |---|
